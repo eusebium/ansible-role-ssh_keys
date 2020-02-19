@@ -1,0 +1,26 @@
+---
+# defaults file for eusebium.ssh_keys
+
+# If you want to distribute the same public key to all play hosts set this to true.
+# The keypair will be generated on ansible controller.
+# Otherwise the keypairs will be generated on every host and will be distributed
+# to all other play hosts.
+ssh_keys_generate_on_controller: false
+ssh_keys_keypair_type: rsa
+ssh_keys_keypair_name: id_test_{{ ssh_keys_keypair_type }}
+# This is ssh client user
+ssh_keys_keypair_owner: root
+# If you generate the key on ansible controller give a good comment to the key
+ssh_keys_keypair_comment: "{{ ssh_keys_keypair_owner }}@{{ ansible_fqdn }}"
+ssh_keys_keypair_dir: ~/.ssh
+ssh_keys_keypair_path: "{{ ssh_keys_keypair_dir }}/{{ ssh_keys_keypair_name }}"
+# This is ssh server user
+ssh_keys_authorized_keys_owner: root
+# Update known_hosts
+ssh_keys_update_known_hosts: true
+# When updating known_hosts select how you will reach the ssh server (ip or hostname).
+# Default is all.
+ssh_keys_ssh_keyscan_hosts:
+  - "{{ ansible_fqdn }}"
+  - "{{ ansible_hostname }}"
+  - "{{ ansible_eth1.ipv4.address }}"

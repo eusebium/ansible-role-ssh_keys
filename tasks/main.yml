@@ -1,0 +1,109 @@
+---
+# tasks file for eusebium.ssh-keys
+- set_fact:
+    _ssh_keys_keypair_owner: "{{ ssh_keys_keypair_owner }}"
+    ssh_keys_keypair_delegate: localhost
+    ssh_keys_keypair_delegate_become: false
+    ssh_keys_keypair_owner: "{{ lookup('env','USER') }}"
+  when: ssh_keys_generate_on_controller | bool
+
+- name: SSH home directory present at client
+  file:
+    path: "~/.ssh"
+    state: directory
+    mode: 0700
+  delegate_to: "{{ ssh_keys_keypair_delegate | default(inventory_hostname) }}"
+  become: "{{ ssh_keys_keypair_delegate_become | default(true) }}"
+  become_user: "{{ ssh_keys_keypair_owner }}"
+
+- name: SSH keypair present at client
+  openssh_keypair:
+    attributes: "{{ ssh_keys_keypair_attributes | default(omit) }}"
+    comment: "{{ ssh_keys_keypair_comment | default(omit) }}"
+    force: "{{ ssh_keys_keypair_force | default(omit) }}"
+    group: "{{ ssh_keys_keypair_group | default(omit) }}"
+    mode: 0600
+    path: "{{ ssh_keys_keypair_path }}"
+    selevel: "{{ ssh_keys_keypair_selevel | default(omit) }}"
+    serole: "{{ ssh_keys_keypair_serole | default(omit) }}"
+    setype: "{{ ssh_keys_keypair_setype | default(omit) }}"
+    seuser: "{{ ssh_keys_keypair_seuser | default(omit) }}"
+    size: "{{ ssh_keys_keypair_size | default(omit) }}"
+    state: present
+    type: "{{ ssh_keys_keypair_type }}"
+  delegate_to: "{{ ssh_keys_keypair_delegate | default(inventory_hostname) }}"
+  become: "{{ ssh_keys_keypair_delegate_become | default(true) }}"
+  become_user: "{{ ssh_keys_keypair_owner }}"
+  register: ssh_keys_keypair_result
+
+- name: SSH public key present
+  set_fact:
+    ssh_keys_keypair_pub: "{{ ssh_keys_keypair_result.public_key }}"
+    ssh_keys_keypair_key: "{{ ssh_keys_keypair_result.filename }}"
+  when: ssh_keys_keypair_result is success
+
+- name: SSH home directory present at server
+  file:
+    path: "~/.ssh"
+    state: directory
+    mode: 0700
+  become: yes
+  become_user: "{{ ssh_keys_authorized_keys_owner }}"
+
+- name: SSH copy private key to remote when generated on controller
+  copy:
+    src: "{{ ssh_keys_keypair_key }}"
+    dest: "~{{ ssh_keys_authorized_keys_owner }}/.ssh/{{ ssh_keys_keypair_key | basename }}"
+    mode: 0600
+    owner: "{{ ssh_keys_authorized_keys_owner }}"
+  become: yes
+  become_user: "{{ ssh_keys_authorized_keys_owner }}"
+  when: ssh_keys_generate_on_controller | bool
+
+- name: SSH public key authorized at server
+  authorized_key:
+    comment: "{{ ssh_keys_authorized_keys_comment | default(ssh_keys_keypair_comment | default(omit) ) }}"
+    exclusive: "{{ ssh_keys_authorized_keys_exclusive | default(omit) }}"
+    key: "{{ ssh_keys_keypair_pub }}"
+    key_options: "{{ ssh_keys_authorized_keys_key_options | default(omit) }}"
+    manage_dir: "{{ ssh_keys_authorized_keys_manage_dir | default(omit) }}"
+    path: "{{ ssh_keys_authorized_keys_path | default(omit) }}"
+    state: present
+    user: "{{ ssh_keys_authorized_keys_owner }}"
+  become: yes
+  become_user: "{{ ssh_keys_authorized_keys_owner }}"
+  delegate_to: "{{ item }}"
+  loop: "{{ ansible_play_batch }}"
+
+- name: SSH update known hosts with all host keys
+  block:
+    - set_fact:
+        ssh_keys_keypair_owner: "{{ _ssh_keys_keypair_owner }}"
+      when: ssh_keys_generate_on_controller | bool
+
+    - name: SSH gather host keys
+      command: ssh-keyscan {{ item }}
+      register: ssh_keys_known_hosts_keyscan
+      delegate_to: "{{ inventory_hostname }}"
+      loop: "{{ ssh_keys_ssh_keyscan_hosts }}"
+      changed_when: false
+
+    - set_fact:
+        ssh_keys_known_hosts_keys: []
+
+    - name: SSH update host keys list with gathered keys
+      set_fact:
+        ssh_keys_known_hosts_keys: "{{ item.stdout_lines + ssh_keys_known_hosts_keys }}"
+      loop: "{{ ssh_keys_known_hosts_keyscan.results }}"
+
+    - name: SSH update known hosts with all host keys
+      known_hosts:
+        name: "{{ item.1.split().0.split(',').0 }}"
+        key: "{{ item.1 }}"
+      become: yes
+      become_user: "{{ ssh_keys_keypair_owner }}"
+      delegate_to: "{{ item.0 }}"
+      loop: "{{ ansible_play_batch | product(ssh_keys_known_hosts_keys) | list }}"
+      changed_when: false
+
+  when: ssh_keys_update_known_hosts | bool
