@@ -104,6 +104,5 @@
       become_user: "{{ ssh_keys_keypair_owner }}"
       delegate_to: "{{ item.0 }}"
       loop: "{{ ansible_play_batch | product(ssh_keys_known_hosts_keys) | list }}"
-      changed_when: false
 
   when: ssh_keys_update_known_hosts | bool
