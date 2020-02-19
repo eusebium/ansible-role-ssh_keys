@@ -23,4 +23,5 @@ ssh_keys_update_known_hosts: true
 ssh_keys_ssh_keyscan_hosts:
   - "{{ ansible_fqdn }}"
   - "{{ ansible_hostname }}"
-  - "{{ ansible_eth1.ipv4.address }}"
+  - "{{ ansible_default_ipv4.address }}"
+  - "{{ ansible_eth1.ipv4.address | default(omit) }}"

@@ -62,7 +62,7 @@
 
 - name: SSH public key authorized at server
   authorized_key:
-    comment: "{{ ssh_keys_authorized_keys_comment | default(ssh_keys_keypair_comment | default(omit) ) }}"
+    comment: "{{ ssh_keys_authorized_keys_comment | default(ssh_keys_keypair_comment | default(omit)) }}"
     exclusive: "{{ ssh_keys_authorized_keys_exclusive | default(omit) }}"
     key: "{{ ssh_keys_keypair_pub }}"
     key_options: "{{ ssh_keys_authorized_keys_key_options | default(omit) }}"
